@@ -33,3 +33,8 @@ type ProviderConfig struct {
 	TopicPublishLocalCandidate  string
 	Serializer                  serializers.Serializer
 }
+
+type WebRTCSession struct {
+	Connection *webrtc.PeerConnection
+	Channel    *webrtc.DataChannel
+}

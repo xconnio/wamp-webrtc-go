@@ -18,7 +18,7 @@ type ClientConfig struct {
 	Serializer               xconn.WSSerializerSpec
 }
 
-func ConnectWebRTC(config *ClientConfig) (*xconn.Session, error) {
+func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 	session, err := xconn.Connect(context.Background(), config.URL, config.Realm)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,19 @@ func ConnectWebRTC(config *ClientConfig) (*xconn.Session, error) {
 
 	channel := <-offerer.WaitReady()
 
-	peer := NewWebRTCPeer(channel)
+	return &WebRTCSession{
+		Channel:    channel,
+		Connection: offerer.connection,
+	}, nil
+}
+
+func ConnectWAMP(config *ClientConfig) (*xconn.Session, error) {
+	webRTCConnection, err := ConnectWebRTC(config)
+	if err != nil {
+		return nil, err
+	}
+
+	peer := NewWebRTCPeer(webRTCConnection.Channel)
 	base, err := xconn.Join(peer, config.Realm, config.Serializer.Serializer(), nil)
 	if err != nil {
 		return nil, err
