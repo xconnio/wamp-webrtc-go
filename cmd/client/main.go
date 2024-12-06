@@ -20,7 +20,7 @@ func main() {
 		TopicAnswererOnCandidate: topicAnswererOnCandidate,
 		Serializer:               xconn.CBORSerializerSpec,
 	}
-	session, err := wamp_webrtc_go.ConnectWebRTC(config)
+	session, err := wamp_webrtc_go.ConnectWAMP(config)
 	if err != nil {
 		log.Fatal(err)
 	}
