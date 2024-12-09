@@ -213,7 +213,7 @@ func (r *WebRTCProvider) onRemoteCandidate(event *xconn.Event) {
 		return
 	}
 
-	candidateJSON, ok := event.Arguments[1].(map[string]any)
+	candidateJSON, ok := event.Arguments[1].(string)
 	if !ok {
 		log.Errorln("offer must be a string")
 		return
