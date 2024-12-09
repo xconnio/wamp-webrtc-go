@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 
+	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/xconn-go"
 )
 
@@ -16,6 +17,7 @@ type ClientConfig struct {
 	ProcedureWebRTCOffer     string
 	TopicAnswererOnCandidate string
 	Serializer               xconn.WSSerializerSpec
+	Authenticator            auth.ClientAuthenticator
 }
 
 func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
@@ -59,6 +61,12 @@ func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 	}
 
 	channel := <-offerer.WaitReady()
+
+	peer := NewWebRTCPeer(channel)
+	_, err = xconn.Join(peer, config.Realm, config.Serializer.Serializer(), config.Authenticator)
+	if err != nil {
+		return nil, err
+	}
 
 	return &WebRTCSession{
 		Channel:    channel,
