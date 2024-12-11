@@ -84,8 +84,9 @@ func (a *Answerer) Answer(answerConfig *AnswerConfig, offer Offer, trickleAfter 
 		}
 	})
 
+	var once sync.Once
 	connection.OnDataChannel(func(d *webrtc.DataChannel) {
-		a.channel <- d
+		once.Do(func() { a.channel <- d })
 	})
 
 	answer, err := connection.CreateAnswer(nil)
