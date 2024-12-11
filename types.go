@@ -38,3 +38,7 @@ type WebRTCSession struct {
 	Connection *webrtc.PeerConnection
 	Channel    *webrtc.DataChannel
 }
+
+func (w *WebRTCSession) OpenChannel(label string, options *webrtc.DataChannelInit) (*webrtc.DataChannel, error) {
+	return w.Connection.CreateDataChannel(label, options)
+}
