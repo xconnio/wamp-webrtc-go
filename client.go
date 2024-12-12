@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 
+	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/xconn-go"
 )
 
@@ -16,9 +17,10 @@ type ClientConfig struct {
 	ProcedureWebRTCOffer     string
 	TopicAnswererOnCandidate string
 	Serializer               xconn.WSSerializerSpec
+	Authenticator            auth.ClientAuthenticator
 }
 
-func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
+func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 	session, err := xconn.Connect(context.Background(), config.URL, config.Realm)
 	if err != nil {
 		return nil, err
@@ -66,14 +68,32 @@ func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 	}, nil
 }
 
+func ConnectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
+	webRTCSession, err := connectWebRTC(config)
+	if err != nil {
+		return nil, err
+	}
+
+	peer := NewWebRTCPeer(webRTCSession.Channel)
+	_, err = xconn.Join(peer, config.Realm, config.Serializer.Serializer(), config.Authenticator)
+	if err != nil {
+		return nil, err
+	}
+
+	return &WebRTCSession{
+		Channel:    webRTCSession.Channel,
+		Connection: webRTCSession.Connection,
+	}, nil
+}
+
 func ConnectWAMP(config *ClientConfig) (*xconn.Session, error) {
-	webRTCConnection, err := ConnectWebRTC(config)
+	webRTCConnection, err := connectWebRTC(config)
 	if err != nil {
 		return nil, err
 	}
 
 	peer := NewWebRTCPeer(webRTCConnection.Channel)
-	base, err := xconn.Join(peer, config.Realm, config.Serializer.Serializer(), nil)
+	base, err := xconn.Join(peer, config.Realm, config.Serializer.Serializer(), config.Authenticator)
 	if err != nil {
 		return nil, err
 	}

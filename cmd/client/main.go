@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wamp-webrtc-go"
+	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/xconn-go"
 )
 
@@ -19,8 +20,9 @@ func main() {
 		ProcedureWebRTCOffer:     procedureWebRTCOffer,
 		TopicAnswererOnCandidate: topicAnswererOnCandidate,
 		Serializer:               xconn.CBORSerializerSpec,
+		Authenticator:            auth.NewCRAAuthenticator("john", map[string]any{}, "hello"),
 	}
-	session, err := wamp_webrtc_go.ConnectWAMP(config)
+	session, err := wamp_webrtc_go.ConnectWebRTC(config)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -3,6 +3,7 @@ package wamp_webrtc_go
 import (
 	"github.com/pion/webrtc/v4"
 
+	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/wampproto-go/serializers"
 	"github.com/xconnio/xconn-go"
 )
@@ -32,6 +33,8 @@ type ProviderConfig struct {
 	TopicHandleRemoteCandidates string
 	TopicPublishLocalCandidate  string
 	Serializer                  serializers.Serializer
+	Routed                      bool
+	Authenticator               auth.ServerAuthenticator
 }
 
 type WebRTCSession struct {

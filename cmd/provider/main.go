@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wamp-webrtc-go"
+	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/wampproto-go/serializers"
 	"github.com/xconnio/xconn-go"
 )
@@ -16,7 +18,67 @@ const (
 	procedureWebRTCOffer     = "io.xconn.webrtc.offer"
 	topicOffererOnCandidate  = "io.xconn.webrtc.offerer.on_candidate"
 	topicAnswererOnCandidate = "io.xconn.webrtc.answerer.on_candidate"
+
+	testRealm     = "realm1"
+	testSecret    = "hello"
+	testTicket    = "hello"
+	testPublicKey = "f0e3cff77bd851015a99d873e302803d83e693cde41ffe545b26124713bdb08b"
 )
+
+type Authenticator struct{}
+
+func NewAuthenticator() *Authenticator {
+	return &Authenticator{}
+}
+
+func (a *Authenticator) Methods() []auth.Method {
+	return []auth.Method{auth.MethodAnonymous, auth.MethodTicket, auth.MethodCRA, auth.MethodCryptoSign}
+}
+
+func (a *Authenticator) Authenticate(request auth.Request) (auth.Response, error) {
+	switch request.AuthMethod() {
+	case auth.MethodAnonymous:
+		if request.Realm() == testRealm {
+			return auth.NewResponse(request.AuthID(), request.AuthRole(), 0)
+		}
+
+		return nil, fmt.Errorf("invalid realm")
+
+	case auth.MethodTicket:
+		ticketRequest, ok := request.(*auth.TicketRequest)
+		if !ok {
+			return nil, fmt.Errorf("invalid request")
+		}
+
+		if ticketRequest.Realm() == testRealm && ticketRequest.Ticket() == testTicket {
+			return auth.NewResponse(ticketRequest.AuthID(), ticketRequest.AuthRole(), 0)
+		}
+
+		return nil, fmt.Errorf("invalid ticket")
+
+	case auth.MethodCRA:
+		if request.Realm() == testRealm {
+			return auth.NewCRAResponse(request.AuthID(), request.AuthRole(), testSecret, 0), nil
+		}
+
+		return nil, fmt.Errorf("invalid realm")
+
+	case auth.MethodCryptoSign:
+		cryptosignRequest, ok := request.(*auth.RequestCryptoSign)
+		if !ok {
+			return nil, fmt.Errorf("invalid request")
+		}
+
+		if cryptosignRequest.Realm() == testRealm && cryptosignRequest.PublicKey() == testPublicKey {
+			return auth.NewResponse(cryptosignRequest.AuthID(), cryptosignRequest.AuthRole(), 0)
+		}
+
+		return nil, fmt.Errorf("unknown publickey")
+
+	default:
+		return nil, fmt.Errorf("unknown authentication method: %v", request.AuthMethod())
+	}
+}
 
 func main() {
 	session, err := xconn.Connect(context.Background(), "ws://localhost:8080/ws", "realm1")
@@ -31,6 +93,7 @@ func main() {
 		TopicHandleRemoteCandidates: topicOffererOnCandidate,
 		TopicPublishLocalCandidate:  topicAnswererOnCandidate,
 		Serializer:                  &serializers.CBORSerializer{},
+		Authenticator:               NewAuthenticator(),
 	}
 	webRtcManager.Setup(cfg)
 

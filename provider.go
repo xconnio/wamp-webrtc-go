@@ -3,6 +3,7 @@ package wamp_webrtc_go
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wampproto-go"
-	"github.com/xconnio/wampproto-go/serializers"
 	"github.com/xconnio/wampproto-go/util"
 	"github.com/xconnio/xconn-go"
 )
@@ -63,8 +63,6 @@ func (r *WebRTCProvider) handleOffer(requestID string, offer Offer, answerConfig
 }
 
 func (r *WebRTCProvider) Setup(config *ProviderConfig) {
-	router := xconn.NewRouter()
-	router.AddRealm("realm1")
 	_, err := config.Session.Register(config.ProcedureHandleOffer, r.offerFunc, nil)
 	if err != nil {
 		log.Errorf("failed to register webrtc offer: %v", err)
@@ -94,7 +92,10 @@ func (r *WebRTCProvider) Setup(config *ProviderConfig) {
 		go func() {
 			select {
 			case channel := <-answerer.WaitReady():
-				r.handleWAMPClient(channel, router, config.Serializer)
+				if err = r.handleWAMPClient(channel, config); err != nil {
+					log.Errorf("failed to handle answer: %v", err)
+					_ = answerer.connection.Close()
+				}
 			case <-time.After(20 * time.Second):
 				log.Errorln("webrtc connection didn't establish after 20 seconds")
 			}
@@ -102,25 +103,27 @@ func (r *WebRTCProvider) Setup(config *ProviderConfig) {
 	})
 }
 
-func (r *WebRTCProvider) handleWAMPClient(channel *webrtc.DataChannel, xconnRouter *xconn.Router,
-	serializer serializers.Serializer) {
+func (r *WebRTCProvider) handleWAMPClient(channel *webrtc.DataChannel, config *ProviderConfig) error {
 	rtcPeer := NewWebRTCPeer(channel)
 
-	hello, err := xconn.ReadHello(rtcPeer, serializer)
+	hello, err := xconn.ReadHello(rtcPeer, config.Serializer)
 	if err != nil {
-		log.Errorf("failed to read hello: %v", err)
-		return
+		return err
 	}
 
-	base, err := xconn.Accept(rtcPeer, hello, serializer, nil)
+	base, err := xconn.Accept(rtcPeer, hello, config.Serializer, config.Authenticator)
 	if err != nil {
-		log.Errorln(err)
-		return
+		return err
 	}
 
+	if !config.Routed {
+		return nil
+	}
+
+	xconnRouter := xconn.NewRouter()
+	xconnRouter.AddRealm("realm1")
 	if err = xconnRouter.AttachClient(base); err != nil {
-		log.Errorf("failed to attach client %v", err)
-		return
+		return fmt.Errorf("failed to attach client %w", err)
 	}
 
 	parser := NewWebRTCMessageAssembler()
@@ -148,22 +151,24 @@ func (r *WebRTCProvider) handleWAMPClient(channel *webrtc.DataChannel, xconnRout
 
 		if err = xconnRouter.ReceiveMessage(base, msg); err != nil {
 			log.Println(err)
-			return
+			return nil
 		}
 
-		data, err := serializer.Serialize(msg)
+		data, err := config.Serializer.Serialize(msg)
 		if err != nil {
 			log.Printf("failed to serialize message: %v", err)
-			return
+			return nil
 		}
 
 		for chunk := range parser.ChunkMessage(data) {
 			if err = channel.Send(chunk); err != nil {
 				log.Errorf("failed to write message: %v", err)
-				return
+				return nil
 			}
 		}
 	}
+
+	return err
 }
 
 func (r *WebRTCProvider) offerFunc(_ context.Context, invocation *xconn.Invocation) *xconn.Result {
