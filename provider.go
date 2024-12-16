@@ -19,12 +19,15 @@ type WebRTCProvider struct {
 	answerers     map[string]*Answerer
 	onNewAnswerer func(sessionID string, answerer *Answerer)
 
+	iceServers []webrtc.ICEServer
+
 	sync.Mutex
 }
 
 func NewWebRTCHandler() *WebRTCProvider {
 	return &WebRTCProvider{
-		answerers: make(map[string]*Answerer),
+		answerers:  make(map[string]*Answerer),
+		iceServers: make([]webrtc.ICEServer, 0),
 	}
 }
 
@@ -62,6 +65,7 @@ func (r *WebRTCProvider) handleOffer(requestID string, offer Offer, answerConfig
 }
 
 func (r *WebRTCProvider) Setup(config *ProviderConfig) {
+	r.iceServers = append(r.iceServers, config.IceServers...)
 	_, err := config.Session.Register(config.ProcedureHandleOffer, r.offerFunc, nil)
 	if err != nil {
 		log.Errorf("failed to register webrtc offer: %v", err)
@@ -190,9 +194,10 @@ func (r *WebRTCProvider) offerFunc(_ context.Context, invocation *xconn.Invocati
 		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{err.Error()}}
 	}
 
-	cfg := &AnswerConfig{ICEServers: []webrtc.ICEServer{
-		{URLs: []string{"stun:stun.l.google.com:19302"}},
-	}}
+	r.iceServers = append(r.iceServers, webrtc.ICEServer{URLs: []string{"stun:stun.l.google.com:19302"}})
+
+	cfg := &AnswerConfig{ICEServers: r.iceServers}
+
 	answer, err := r.handleOffer(requestID, offer, cfg)
 	if err != nil {
 		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{err.Error()}}
