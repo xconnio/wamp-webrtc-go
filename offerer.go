@@ -1,6 +1,8 @@
 package wamp_webrtc_go
 
 import (
+	"encoding/json"
+
 	"github.com/pion/webrtc/v4"
 	log "github.com/sirupsen/logrus"
 
@@ -32,8 +34,14 @@ func (o *Offerer) Offer(offerConfig *OfferConfig, session *xconn.Session, reques
 
 	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate != nil {
+			answerData, err := json.Marshal(candidate.ToJSON())
+			if err != nil {
+				log.Errorf("failed to marshal answer: %v", err)
+				return
+			}
+
 			_ = session.Publish(offerConfig.TopicAnswererOnCandidate,
-				[]any{requestID, candidate.ToJSON()}, nil, nil)
+				[]any{requestID, string(answerData)}, nil, nil)
 		}
 	})
 
