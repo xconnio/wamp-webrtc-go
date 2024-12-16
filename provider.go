@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pion/webrtc/v4"
 	log "github.com/sirupsen/logrus"
 
@@ -225,7 +224,7 @@ func (r *WebRTCProvider) onRemoteCandidate(event *xconn.Event) {
 	}
 
 	var candidate webrtc.ICECandidateInit
-	if err := mapstructure.Decode(candidateJSON, &candidate); err != nil {
+	if err := json.Unmarshal([]byte(candidateJSON), &candidate); err != nil {
 		return
 	}
 
