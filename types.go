@@ -35,6 +35,7 @@ type ProviderConfig struct {
 	Serializer                  serializers.Serializer
 	Routed                      bool
 	Authenticator               auth.ServerAuthenticator
+	IceServers                  []webrtc.ICEServer
 }
 
 type WebRTCSession struct {
