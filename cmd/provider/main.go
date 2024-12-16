@@ -90,8 +90,8 @@ func main() {
 	cfg := &wamp_webrtc_go.ProviderConfig{
 		Session:                     session,
 		ProcedureHandleOffer:        procedureWebRTCOffer,
-		TopicHandleRemoteCandidates: topicOffererOnCandidate,
-		TopicPublishLocalCandidate:  topicAnswererOnCandidate,
+		TopicHandleRemoteCandidates: topicAnswererOnCandidate,
+		TopicPublishLocalCandidate:  topicOffererOnCandidate,
 		Serializer:                  &serializers.CBORSerializer{},
 		Authenticator:               NewAuthenticator(),
 	}
