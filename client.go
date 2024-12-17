@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wampproto-go/auth"
 	"github.com/xconnio/xconn-go"
@@ -16,6 +17,7 @@ type ClientConfig struct {
 	Realm                    string
 	ProcedureWebRTCOffer     string
 	TopicAnswererOnCandidate string
+	TopicOffererOnCandidate  string
 	Serializer               xconn.WSSerializerSpec
 	Authenticator            auth.ClientAuthenticator
 }
@@ -33,6 +35,33 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		Ordered:                  true,
 		TopicAnswererOnCandidate: config.TopicAnswererOnCandidate,
 	}
+
+	_, err = session.Subscribe(config.TopicOffererOnCandidate, func(event *xconn.Event) {
+		if len(event.Arguments) < 2 {
+			log.Errorf("invalid arguments length")
+			return
+		}
+
+		candidateJSON, ok := event.Arguments[1].(string)
+		if !ok {
+			log.Errorln("offer must be a string")
+			return
+		}
+
+		var candidate webrtc.ICECandidateInit
+		if err := json.Unmarshal([]byte(candidateJSON), &candidate); err != nil {
+			log.Errorln(err)
+			return
+		}
+
+		if err = offerer.AddICECandidate(candidate); err != nil {
+			log.Errorln(err)
+		}
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	requestID := uuid.New().String()
 	offer, err := offerer.Offer(offerConfig, session, requestID)
 	if err != nil {
