@@ -11,6 +11,7 @@ import (
 const (
 	procedureWebRTCOffer     = "io.xconn.webrtc.offer"
 	topicAnswererOnCandidate = "io.xconn.webrtc.answerer.on_candidate"
+	topicOffererOnCandidate  = "io.xconn.webrtc.offerer.on_candidate"
 )
 
 func main() {
@@ -19,6 +20,7 @@ func main() {
 		Realm:                    "realm1",
 		ProcedureWebRTCOffer:     procedureWebRTCOffer,
 		TopicAnswererOnCandidate: topicAnswererOnCandidate,
+		TopicOffererOnCandidate:  topicOffererOnCandidate,
 		Serializer:               xconn.CBORSerializerSpec,
 		Authenticator:            auth.NewCRAAuthenticator("john", map[string]any{}, "hello"),
 	}

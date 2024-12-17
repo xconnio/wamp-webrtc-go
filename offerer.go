@@ -98,6 +98,10 @@ func (o *Offerer) HandleAnswer(answer Answer) error {
 	return nil
 }
 
+func (o *Offerer) AddICECandidate(candidate webrtc.ICECandidateInit) error {
+	return o.connection.AddICECandidate(candidate)
+}
+
 func (o *Offerer) WaitReady() chan *webrtc.DataChannel {
 	return o.channel
 }
