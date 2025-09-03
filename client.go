@@ -18,12 +18,12 @@ type ClientConfig struct {
 	ProcedureWebRTCOffer     string
 	TopicAnswererOnCandidate string
 	TopicOffererOnCandidate  string
-	Serializer               xconn.WSSerializerSpec
+	Serializer               xconn.SerializerSpec
 	Authenticator            auth.ClientAuthenticator
 }
 
 func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
-	session, err := xconn.Connect(context.Background(), config.URL, config.Realm)
+	session, err := xconn.ConnectAnonymous(context.Background(), config.URL, config.Realm)
 	if err != nil {
 		return nil, err
 	}
@@ -36,14 +36,14 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		TopicAnswererOnCandidate: config.TopicAnswererOnCandidate,
 	}
 
-	_, err = session.Subscribe(config.TopicOffererOnCandidate, func(event *xconn.Event) {
-		if len(event.Arguments) < 2 {
+	subscribeResponse := session.Subscribe(config.TopicOffererOnCandidate, func(event *xconn.Event) {
+		if len(event.Args()) < 2 {
 			log.Errorf("invalid arguments length")
 			return
 		}
 
-		candidateJSON, ok := event.Arguments[1].(string)
-		if !ok {
+		candidateJSON, err := event.ArgString(1)
+		if err != nil {
 			log.Errorln("offer must be a string")
 			return
 		}
@@ -57,9 +57,9 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		if err = offerer.AddICECandidate(candidate); err != nil {
 			log.Errorln(err)
 		}
-	}, nil)
-	if err != nil {
-		return nil, err
+	}).Do()
+	if subscribeResponse.Err != nil {
+		return nil, subscribeResponse.Err
 	}
 
 	requestID := uuid.New().String()
@@ -73,13 +73,15 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		return nil, err
 	}
 
-	result, err := session.Call(context.Background(), config.ProcedureWebRTCOffer,
-		[]any{requestID, string(offerJSON)}, nil, nil)
+	callResponse := session.Call(config.ProcedureWebRTCOffer).Args(requestID, string(offerJSON)).Do()
+	if callResponse.Err != nil {
+		return nil, callResponse.Err
+	}
+
+	answerText, err := callResponse.Args[0].String()
 	if err != nil {
 		return nil, err
 	}
-
-	answerText := result.Arguments[0].(string)
 	var answer Answer
 	if err = json.Unmarshal([]byte(answerText), &answer); err != nil {
 		return nil, err

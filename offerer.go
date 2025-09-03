@@ -40,8 +40,7 @@ func (o *Offerer) Offer(offerConfig *OfferConfig, session *xconn.Session, reques
 				return
 			}
 
-			_ = session.Publish(offerConfig.TopicAnswererOnCandidate,
-				[]any{requestID, string(answerData)}, nil, nil)
+			_ = session.Publish(offerConfig.TopicAnswererOnCandidate).Args(requestID, string(answerData)).Do()
 		}
 	})
 

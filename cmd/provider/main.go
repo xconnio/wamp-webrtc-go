@@ -39,7 +39,7 @@ func (a *Authenticator) Authenticate(request auth.Request) (auth.Response, error
 	switch request.AuthMethod() {
 	case auth.MethodAnonymous:
 		if request.Realm() == testRealm {
-			return auth.NewResponse(request.AuthID(), request.AuthRole(), 0)
+			return auth.NewResponse(request.AuthID(), "anonymous", 0)
 		}
 
 		return nil, fmt.Errorf("invalid realm")
@@ -51,14 +51,14 @@ func (a *Authenticator) Authenticate(request auth.Request) (auth.Response, error
 		}
 
 		if ticketRequest.Realm() == testRealm && ticketRequest.Ticket() == testTicket {
-			return auth.NewResponse(ticketRequest.AuthID(), ticketRequest.AuthRole(), 0)
+			return auth.NewResponse(ticketRequest.AuthID(), "anonymous", 0)
 		}
 
 		return nil, fmt.Errorf("invalid ticket")
 
 	case auth.MethodCRA:
 		if request.Realm() == testRealm {
-			return auth.NewCRAResponse(request.AuthID(), request.AuthRole(), testSecret, 0), nil
+			return auth.NewCRAResponse(request.AuthID(), "anonymous", testSecret, 0), nil
 		}
 
 		return nil, fmt.Errorf("invalid realm")
@@ -70,7 +70,7 @@ func (a *Authenticator) Authenticate(request auth.Request) (auth.Response, error
 		}
 
 		if cryptosignRequest.Realm() == testRealm && cryptosignRequest.PublicKey() == testPublicKey {
-			return auth.NewResponse(cryptosignRequest.AuthID(), cryptosignRequest.AuthRole(), 0)
+			return auth.NewResponse(cryptosignRequest.AuthID(), "anonymous", 0)
 		}
 
 		return nil, fmt.Errorf("unknown publickey")
@@ -81,7 +81,7 @@ func (a *Authenticator) Authenticate(request auth.Request) (auth.Response, error
 }
 
 func main() {
-	session, err := xconn.Connect(context.Background(), "ws://localhost:8080/ws", "realm1")
+	session, err := xconn.ConnectAnonymous(context.Background(), "ws://localhost:8080/ws", "realm1")
 	if err != nil {
 		log.Fatal("Failed to connect to server:", err)
 	}
@@ -103,6 +103,6 @@ func main() {
 
 	select {
 	case <-closeChan:
-	case <-session.LeaveChan():
+	case <-session.Done():
 	}
 }
