@@ -22,7 +22,7 @@ func main() {
 		TopicAnswererOnCandidate: topicAnswererOnCandidate,
 		TopicOffererOnCandidate:  topicOffererOnCandidate,
 		Serializer:               xconn.CBORSerializerSpec,
-		Authenticator:            auth.NewCRAAuthenticator("john", map[string]any{}, "hello"),
+		Authenticator:            auth.NewCRAAuthenticator("john", "hello", map[string]any{}),
 	}
 	session, err := wamp_webrtc_go.ConnectWebRTC(config)
 	if err != nil {

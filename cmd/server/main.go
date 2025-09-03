@@ -11,11 +11,13 @@ import (
 
 func main() {
 	r := xconn.NewRouter()
-	r.AddRealm("realm1")
+	if err := r.AddRealm("realm1"); err != nil {
+		log.Fatal(err)
+	}
 	defer r.Close()
 
 	server := xconn.NewServer(r, nil, nil)
-	closer, err := server.Start("0.0.0.0", 8080)
+	closer, err := server.ListenAndServeWebSocket(xconn.NetworkTCP, "0.0.0.0:8080")
 	if err != nil {
 		log.Fatal("Failed to start server:", err)
 	}

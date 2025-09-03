@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wampproto-go"
-	"github.com/xconnio/wampproto-go/util"
 	"github.com/xconnio/xconn-go"
 )
 
@@ -66,15 +65,15 @@ func (r *WebRTCProvider) handleOffer(requestID string, offer Offer, answerConfig
 
 func (r *WebRTCProvider) Setup(config *ProviderConfig) {
 	r.iceServers = append(r.iceServers, config.IceServers...)
-	_, err := config.Session.Register(config.ProcedureHandleOffer, r.offerFunc, nil)
-	if err != nil {
-		log.Errorf("failed to register webrtc offer: %v", err)
+	registerResp := config.Session.Register(config.ProcedureHandleOffer, r.offerFunc).Do()
+	if registerResp.Err != nil {
+		log.Errorf("failed to register webrtc offer: %v", registerResp.Err)
 		return
 	}
 
-	_, err = config.Session.Subscribe(config.TopicHandleRemoteCandidates, r.onRemoteCandidate, nil)
-	if err != nil {
-		log.Errorf("failed to subscribe to webrtc candidates events: %v", err)
+	subscribeResp := config.Session.Subscribe(config.TopicHandleRemoteCandidates, r.onRemoteCandidate).Do()
+	if subscribeResp.Err != nil {
+		log.Errorf("failed to subscribe to webrtc candidates events: %v", subscribeResp.Err)
 		return
 	}
 
@@ -87,15 +86,16 @@ func (r *WebRTCProvider) Setup(config *ProviderConfig) {
 			}
 
 			args := []any{sessionID, string(answerData)}
-			if err = config.Session.Publish(config.TopicPublishLocalCandidate, args, nil, nil); err != nil {
-				log.Errorf("failed to publish answer: %v", err)
+			publishResp := config.Session.Publish(config.TopicPublishLocalCandidate).Args(args...).Do()
+			if publishResp.Err != nil {
+				log.Errorf("failed to publish answer: %v", publishResp.Err)
 			}
 		})
 
 		go func() {
 			select {
 			case channel := <-answerer.WaitReady():
-				if err = r.handleWAMPClient(channel, config); err != nil {
+				if err := r.handleWAMPClient(channel, config); err != nil {
 					log.Errorf("failed to handle answer: %v", err)
 					_ = answerer.connection.Close()
 				}
@@ -124,7 +124,9 @@ func (r *WebRTCProvider) handleWAMPClient(channel *webrtc.DataChannel, config *P
 	}
 
 	xconnRouter := xconn.NewRouter()
-	xconnRouter.AddRealm("realm1")
+	if err := xconnRouter.AddRealm("realm1"); err != nil {
+		return err
+	}
 	if err = xconnRouter.AttachClient(base); err != nil {
 		return fmt.Errorf("failed to attach client %w", err)
 	}
@@ -174,24 +176,24 @@ func (r *WebRTCProvider) handleWAMPClient(channel *webrtc.DataChannel, config *P
 	return err
 }
 
-func (r *WebRTCProvider) offerFunc(_ context.Context, invocation *xconn.Invocation) *xconn.Result {
-	if len(invocation.Arguments) < 2 {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument}
+func (r *WebRTCProvider) offerFunc(_ context.Context, invocation *xconn.Invocation) *xconn.InvocationResult {
+	if len(invocation.Args()) < 2 {
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument)
 	}
 
-	requestID, ok := util.AsString(invocation.Arguments[0])
-	if !ok {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{"request ID must be a string"}}
+	requestID, err := invocation.ArgString(0)
+	if err != nil {
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument, "request ID must be a string")
 	}
 
-	offerJSON, ok := util.AsString(invocation.Arguments[1])
-	if !ok {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{"offer must be a string"}}
+	offerJSON, err := invocation.ArgString(1)
+	if err != nil {
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument, "offer JSON must be a string")
 	}
 
 	var offer Offer
 	if err := json.Unmarshal([]byte(offerJSON), &offer); err != nil {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{err.Error()}}
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument, err.Error())
 	}
 
 	r.iceServers = append(r.iceServers, webrtc.ICEServer{URLs: []string{"stun:stun.l.google.com:19302"}})
@@ -200,30 +202,30 @@ func (r *WebRTCProvider) offerFunc(_ context.Context, invocation *xconn.Invocati
 
 	answer, err := r.handleOffer(requestID, offer, cfg)
 	if err != nil {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{err.Error()}}
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument, err.Error())
 	}
 
 	answerData, err := json.Marshal(answer)
 	if err != nil {
-		return &xconn.Result{Err: wampproto.ErrInvalidArgument, Arguments: []any{err.Error()}}
+		return xconn.NewInvocationError(wampproto.ErrInvalidArgument, err.Error())
 	}
 
-	return &xconn.Result{Arguments: []any{string(answerData)}}
+	return xconn.NewInvocationResult(string(answerData))
 }
 
 func (r *WebRTCProvider) onRemoteCandidate(event *xconn.Event) {
-	if len(event.Arguments) < 2 {
+	if len(event.Args()) < 2 {
 		return
 	}
 
-	requestID, ok := util.AsString(event.Arguments[0])
-	if !ok {
+	requestID, err := event.ArgString(0)
+	if err != nil {
 		log.Errorln("request ID must be a string")
 		return
 	}
 
-	candidateJSON, ok := event.Arguments[1].(string)
-	if !ok {
+	candidateJSON, err := event.ArgString(1)
+	if err != nil {
 		log.Errorln("offer must be a string")
 		return
 	}
