@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
-	defer closer.Close()
+	defer func() { _ = closer.Close() }()
 
 	// Close server if SIGINT (CTRL-c) received.
 	closeChan := make(chan os.Signal, 1)
