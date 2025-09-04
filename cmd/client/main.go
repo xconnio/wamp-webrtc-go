@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/xconnio/wamp-webrtc-go"
@@ -15,19 +17,24 @@ const (
 )
 
 func main() {
+	session, err := xconn.ConnectAnonymous(context.Background(), "ws://localhost:8080/ws", "realm1")
+	if err != nil {
+		log.Fatal("Failed to connect to server:", err)
+	}
+
 	config := &wamp_webrtc_go.ClientConfig{
-		URL:                      "ws://localhost:8080/ws",
 		Realm:                    "realm1",
 		ProcedureWebRTCOffer:     procedureWebRTCOffer,
 		TopicAnswererOnCandidate: topicAnswererOnCandidate,
 		TopicOffererOnCandidate:  topicOffererOnCandidate,
 		Serializer:               xconn.CBORSerializerSpec,
 		Authenticator:            auth.NewCRAAuthenticator("john", "hello", map[string]any{}),
+		Session:                  session,
 	}
-	session, err := wamp_webrtc_go.ConnectWebRTC(config)
+	webRTCSession, err := wamp_webrtc_go.ConnectWebRTC(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println(session)
+	log.Println(webRTCSession)
 }
