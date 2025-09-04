@@ -1,8 +1,8 @@
 package wamp_webrtc_go
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
@@ -13,21 +13,19 @@ import (
 )
 
 type ClientConfig struct {
-	URL                      string
 	Realm                    string
 	ProcedureWebRTCOffer     string
 	TopicAnswererOnCandidate string
 	TopicOffererOnCandidate  string
 	Serializer               xconn.SerializerSpec
 	Authenticator            auth.ClientAuthenticator
+	Session                  *xconn.Session
 }
 
 func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
-	session, err := xconn.ConnectAnonymous(context.Background(), config.URL, config.Realm)
-	if err != nil {
-		return nil, err
+	if config.Session == nil {
+		return nil, fmt.Errorf("invalid client config: Session must not be nil")
 	}
-
 	offerer := NewOfferer()
 	offerConfig := &OfferConfig{
 		Protocol:                 config.Serializer.SubProtocol(),
@@ -36,7 +34,7 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		TopicAnswererOnCandidate: config.TopicAnswererOnCandidate,
 	}
 
-	subscribeResponse := session.Subscribe(config.TopicOffererOnCandidate, func(event *xconn.Event) {
+	subscribeResponse := config.Session.Subscribe(config.TopicOffererOnCandidate, func(event *xconn.Event) {
 		if len(event.Args()) < 2 {
 			log.Errorf("invalid arguments length")
 			return
@@ -63,7 +61,7 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 	}
 
 	requestID := uuid.New().String()
-	offer, err := offerer.Offer(offerConfig, session, requestID)
+	offer, err := offerer.Offer(offerConfig, config.Session, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +71,7 @@ func connectWebRTC(config *ClientConfig) (*WebRTCSession, error) {
 		return nil, err
 	}
 
-	callResponse := session.Call(config.ProcedureWebRTCOffer).Args(requestID, string(offerJSON)).Do()
+	callResponse := config.Session.Call(config.ProcedureWebRTCOffer).Args(requestID, string(offerJSON)).Do()
 	if callResponse.Err != nil {
 		return nil, callResponse.Err
 	}
