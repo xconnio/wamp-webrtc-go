@@ -9,8 +9,8 @@ require (
 	github.com/pion/webrtc/v4 v4.0.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	github.com/xconnio/wampproto-go v0.0.0-20250828114121-f059fafc25b7
-	github.com/xconnio/xconn-go v0.0.0-20250829091103-0f7ccc5864a2
+	github.com/xconnio/wampproto-go v0.0.0-20250904095518-e79af763bcae
+	github.com/xconnio/xconn-go v0.0.0-20250904111951-c9af0abb2ffc
 )
 
 require (
